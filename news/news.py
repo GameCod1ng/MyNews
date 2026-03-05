@@ -34,14 +34,31 @@ async def send_telegram_msg(text):
     await bot.send_message(chat_id=CHAT_ID, text=text)
 
 def summarize_text(text, n=3):
-    """TF-IDF 기반 문장 요약"""
+    # 1. 문장 분리
     sentences = re.split(r'(?<=[.!?])\s+', text.strip())
-    if len(sentences) <= n: return sentences
-    tfidf = TfidfVectorizer().fit_transform(sentences)
+    
+    # 2. 불필요한 안내 문구 필터링 (필터링 리스트 추가)
+    filter_keywords = ["기사 섹션 분류", "언론사는 개별 기사", "중복 분류할 수 있습니다", "무단 전재", "재배포 금지"]
+    
+    clean_sentences = []
+    for s in sentences:
+        # 키워드가 포함되지 않은 문장만 리스트에 추가
+        if not any(keyword in s for keyword in filter_keywords):
+            # 문장 길이가 너무 짧은 것(광고 등)도 제외
+            if len(s.strip()) > 10:
+                clean_sentences.append(s.strip())
+
+    # 필터링 후 문장이 부족하면 그대로 반환
+    if len(clean_sentences) <= n: 
+        return clean_sentences
+    
+    # 3. TF-IDF 요약 진행
+    tfidf = TfidfVectorizer().fit_transform(clean_sentences)
     sentence_scores = np.array(tfidf.sum(axis=1)).flatten()
     top_indices = np.argsort(sentence_scores)[-n:]
     top_indices.sort()
-    return [sentences[i] for i in top_indices]
+    
+    return [clean_sentences[i] for i in top_indices]
 
 def get_latest_news_url(keyword):
     """구글에서 키워드로 최신 뉴스 URL 1개 추출"""
@@ -176,3 +193,4 @@ if st.session_state['history']:
                     st.error(f"전송 실패: {e}")
 else:
     st.write("아직 요약된 뉴스가 없습니다. 왼쪽 사이드바에서 URL을 입력하세요.")
+

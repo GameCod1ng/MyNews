@@ -79,9 +79,15 @@ st.markdown("""
 
 with st.sidebar:
     st.title("📲 메뉴")
-    input_url = st.text_input("🔗 뉴스 URL (네이버 등)")
+    input_url = st.text_input("🔗 뉴스 URL 입력")
     summary_count = st.slider("요약 문장 수", 1, 5, 3)
-    analyze_btn = st.button("뉴스 분석 시작")
+    analyze_btn = st.button("뉴스 분석 시작", use_container_width=True)
+    
+    st.markdown("---")
+    # 전체 삭제 버튼 다시 추가
+    if st.button("🗑️ 전체 내역 초기화", use_container_width=True):
+        st.session_state['history'] = []
+        st.rerun()
 
 # --- 5. 분석 로직 ---
 if analyze_btn and input_url:
@@ -113,20 +119,25 @@ if st.session_state['history']:
     cols = st.columns(2)
     for idx, item in enumerate(st.session_state['history']):
         with cols[idx % 2]:
+            # 카드 디자인 (삭제 버튼 공간 확보를 위해 relative 포지션 사용)
             st.markdown(f"""
-                <div class="news-card">
+                <div class="news-card" style="position: relative;">
                     <div class="card-title">📌 {item['title']}</div>
                     <div class="card-summary">{item['summary'].replace('\n', '<br>')}</div>
-                    <div style="margin-top:15px; font-size:0.8rem; color:#888;">📎 {item['url'][:60]}...</div>
                 </div>
                 """, unsafe_allow_html=True)
             
-            # 텔레그램 버튼
-            if st.button(f"📱 {idx+1}번 뉴스 푸시", key=f"btn_{idx}", use_container_width=True):
-                # asyncio/telegram 로직 (기존과 동일)
-                st.toast("전송 준비 중...")
-else:
-    st.info("사이드바에 뉴스 링크를 넣고 버튼을 눌러보세요!")
+            # 버튼들을 가로로 배치 (전송 / 삭제)
+            btn_col1, btn_col2 = st.columns([4, 1])
+            with btn_col1:
+                if st.button(f"📱 {idx+1}번 뉴스 전송", key=f"send_{idx}", use_container_width=True):
+                    st.toast("전송 기능을 실행합니다.")
+            with btn_col2:
+                # 개별 삭제 버튼
+                if st.button("❌", key=f"del_{idx}", help="이 카드 삭제"):
+                    st.session_state['history'].pop(idx)
+                    st.rerun()
+
 
 
 

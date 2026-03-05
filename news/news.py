@@ -116,27 +116,46 @@ if analyze_btn and input_url:
 st.title("🚀 스마트 뉴스 요약 카드")
 
 if st.session_state['history']:
+    st.subheader("📋 요약된 뉴스 카드 목록")
     cols = st.columns(2)
+    
     for idx, item in enumerate(st.session_state['history']):
         with cols[idx % 2]:
-            # 카드 디자인 (삭제 버튼 공간 확보를 위해 relative 포지션 사용)
+            # 1. 카드 본체 (제목 + 요약 + 하단 링크)
             st.markdown(f"""
-                <div class="news-card" style="position: relative;">
+                <div class="news-card">
                     <div class="card-title">📌 {item['title']}</div>
-                    <div class="card-summary">{item['summary'].replace('\n', '<br>')}</div>
+                    <div class="card-summary">
+                        {item['summary'].replace('\n', '<br>')}
+                    </div>
+                    <div style="margin-top: 15px; padding-top: 12px; border-top: 1px solid #eee;">
+                        <div style="font-size: 0.85rem; color: #666; font-weight: bold; margin-bottom: 5px;">🔗 원문 링크</div>
+                        <a href="{item['url']}" target="_blank" style="color: #007bff; font-size: 0.8rem; text-decoration: none; word-break: break-all; display: block; line-height: 1.4;">
+                            {item['url']}
+                        </a>
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
             
-            # 버튼들을 가로로 배치 (전송 / 삭제)
+            # 2. 하단 액션 버튼 (전송 / 삭제)
             btn_col1, btn_col2 = st.columns([4, 1])
             with btn_col1:
-                if st.button(f"📱 {idx+1}번 뉴스 전송", key=f"send_{idx}", use_container_width=True):
-                    st.toast("전송 기능을 실행합니다.")
+                if st.button(f"📱 {idx+1}번 뉴스 텔레그램 전송", key=f"send_{idx}", use_container_width=True):
+                    push_msg = f"📢 뉴스 요약: {item['title']}\n\n{item['summary']}\n\n바로가기: {item['url']}"
+                    try:
+                        asyncio.run(send_telegram_msg(push_msg))
+                        st.toast(f"✅ {idx+1}번 전송 완료!")
+                    except Exception as e:
+                        st.error(f"전송 실패: {e}")
             with btn_col2:
-                # 개별 삭제 버튼
-                if st.button("❌", key=f"del_{idx}", help="이 카드 삭제"):
+                if st.button("❌", key=f"del_{idx}", help="이 카드 삭제", use_container_width=True):
                     st.session_state['history'].pop(idx)
                     st.rerun()
+            
+            st.write("") # 카드 사이 여백
+else:
+    st.info("왼쪽 메뉴에서 뉴스 URL을 입력하고 분석을 시작하세요!")
+
 
 
 

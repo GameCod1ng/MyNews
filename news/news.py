@@ -24,6 +24,13 @@ SEARCH_KEYWORD = "삼성전자"
 if 'history' not in st.session_state:
     st.session_state['history'] = []
 
+async def send_telegram_msg(text):
+    if not TELEGRAM_TOKEN or "여기에" in TELEGRAM_TOKEN:
+        st.warning("⚠️ 텔레그램 토큰 설정이 필요합니다.")
+        return
+    bot = Bot(token=TELEGRAM_TOKEN)
+    await bot.send_message(chat_id=CHAT_ID, text=text)
+
 # --- 3. 핵심 함수 (요약 및 클리닝) ---
 def summarize_text(text, n=3):
     # 문장 분리
@@ -155,6 +162,7 @@ if st.session_state['history']:
             st.write("") # 카드 사이 여백
 else:
     st.info("왼쪽 메뉴에서 뉴스 URL을 입력하고 분석을 시작하세요!")
+
 
 
 

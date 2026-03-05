@@ -7,3 +7,5 @@ transformers
 torch
 scikit-learn
 python-telegram-bot
+schedule
+googlesearch-python

@@ -4,7 +4,7 @@
             
             
 import streamlit as st
-from newspaper import Article
+from newspaper import Article, Config
 from sklearn.feature_extraction.text import TfidfVectorizer
 import numpy as np
 import re
@@ -34,31 +34,31 @@ async def send_telegram_msg(text):
     await bot.send_message(chat_id=CHAT_ID, text=text)
 
 def summarize_text(text, n=3):
-    # 1. 문장 분리
+    # 1. 텍스트가 너무 짧으면 필터링 없이 반환
+    if len(text.strip()) < 50:
+        return ["본문 내용이 너무 짧아 요약이 불가능합니다."]
+
+    # 2. 문장 분리
     sentences = re.split(r'(?<=[.!?])\s+', text.strip())
     
-    # 2. 불필요한 안내 문구 필터링 (필터링 리스트 추가)
-    filter_keywords = ["기사 섹션 분류", "언론사는 개별 기사", "중복 분류할 수 있습니다", "무단 전재", "재배포 금지"]
-    
-    clean_sentences = []
-    for s in sentences:
-        # 키워드가 포함되지 않은 문장만 리스트에 추가
-        if not any(keyword in s for keyword in filter_keywords):
-            # 문장 길이가 너무 짧은 것(광고 등)도 제외
-            if len(s.strip()) > 10:
-                clean_sentences.append(s.strip())
+    # 3. 필터링 (최소한의 필터만 적용)
+    filter_keywords = ["기사 섹션 분류", "중복 분류"]
+    clean_sentences = [s.strip() for s in sentences if len(s.strip()) > 10 
+                       and not any(k in s for k in filter_keywords)]
 
-    # 필터링 후 문장이 부족하면 그대로 반환
-    if len(clean_sentences) <= n: 
-        return clean_sentences
-    
-    # 3. TF-IDF 요약 진행
-    tfidf = TfidfVectorizer().fit_transform(clean_sentences)
-    sentence_scores = np.array(tfidf.sum(axis=1)).flatten()
-    top_indices = np.argsort(sentence_scores)[-n:]
-    top_indices.sort()
-    
-    return [clean_sentences[i] for i in top_indices]
+    # 4. 필터링 후 문장이 너무 적으면 그냥 앞부분 반환
+    if len(clean_sentences) <= n:
+        return clean_sentences if clean_sentences else [text[:200] + "..."]
+
+    try:
+        tfidf = TfidfVectorizer().fit_transform(clean_sentences)
+        sentence_scores = np.array(tfidf.sum(axis=1)).flatten()
+        top_indices = np.argsort(sentence_scores)[-n:]
+        top_indices.sort()
+        return [clean_sentences[i] for i in top_indices]
+    except:
+        # 오류 발생 시 앞 3문장 강제 반환
+        return clean_sentences[:n]
 
 def get_latest_news_url(keyword):
     """구글에서 키워드로 최신 뉴스 URL 1개 추출"""
@@ -146,31 +146,31 @@ st.title("🚀 AI 뉴스 스마트 푸시 & 카드")
 
 # [수동 분석 로직]
 if analyze_btn and input_url:
-    with st.spinner('뉴스를 분석 중입니다...'):
+    with st.spinner('뉴스를 읽어오는 중...'):
         try:
-            article = Article(input_url, language='ko')
+            # 브라우저처럼 보이기 위한 설정 추가
+            config = Config()
+            config.browser_user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            
+            article = Article(input_url, language='ko', config=config)
             article.download()
             article.parse()
             
-            # 요약 실행 (수정된 summarize_text 함수 사용)
-            summ_list = summarize_text(article.text, n=summary_count)
-            
-            # 리스트를 하나의 문자열로 결합 (줄바꿈 포함)
-            full_summ = "\n".join([f"• {s}" for s in summ_list])
-            
-            # 데이터가 잘 뽑혔는지 검증
-            if not full_summ.strip():
-                full_summ = "기사 본문을 요약할 수 없습니다. (내용이 너무 짧거나 분석 불가)"
-
-            new_item = {
-                "title": article.title,
-                "summary": full_summ, # 이 값이 정확히 들어가야 합니다
-                "url": input_url
-            }
-            st.session_state['history'].insert(0, new_item)
-            st.success("카드가 추가되었습니다!")
+            # 본문 추출 확인용 로그 (디버깅용)
+            if not article.text.strip():
+                st.error("사이트에서 본문을 읽어오지 못했습니다. URL을 다시 확인해주세요.")
+            else:
+                summ_list = summarize_text(article.text, n=summary_count)
+                full_summ = "\n".join([f"• {s}" for s in summ_list])
+                
+                st.session_state['history'].insert(0, {
+                    "title": article.title,
+                    "summary": full_summ,
+                    "url": input_url
+                })
+                st.rerun() # 화면 즉시 갱신
         except Exception as e:
-            st.error(f"오류 발생: {e}")
+            st.error(f"분석 중 오류 발생: {e}")
 
 # 2. [중앙 뉴스 카드 출력 영역] - HTML 구조 재점검
 if st.session_state['history']:
@@ -200,6 +200,7 @@ if st.session_state['history']:
             if st.button(f"📱 {idx+1}번 뉴스 전송", key=f"send_{idx}", use_container_width=True):
                 # 전송 로직 생략 (기존과 동일)
                 pass
+
 
 
 

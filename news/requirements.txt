@@ -5,3 +5,4 @@ pandas
 # 요약 모델을 사용하신다면 아래도 추가 (용량이 커서 배포가 느려질 수 있음)
 transformers
 torch
+scikit-learn
